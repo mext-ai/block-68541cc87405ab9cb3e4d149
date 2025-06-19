@@ -2,8 +2,13 @@ import React, { useState, useEffect } from 'react';
 
 interface Term {
   id: string;
-  term: string;
-  definition: string;
+  text: string;
+}
+
+interface Definition {
+  id: string;
+  text: string;
+  correctTermId: string;
 }
 
 interface Match {
@@ -17,40 +22,52 @@ interface BlockProps {
 }
 
 const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) => {
-  // Données des termes et définitions ISO 13485
-  const termsData: Term[] = [
+  // Données des termes ISO 13485
+  const originalTerms: Term[] = [
+    { id: 'term_1', text: 'Dispositif médical' },
+    { id: 'term_2', text: 'SMQ' },
+    { id: 'term_3', text: 'Gestion des risques' },
+    { id: 'term_4', text: 'Surveillance post-commercialisation' },
+    { id: 'term_5', text: 'Validation' },
+    { id: 'term_6', text: 'Dossier technique' }
+  ];
+
+  // Données des définitions avec référence au terme correct
+  const originalDefinitions: Definition[] = [
     {
-      id: '1',
-      term: 'Dispositif médical',
-      definition: 'Instrument, appareil, équipement, logiciel, implant, réactif, matière ou autre article destiné par le fabricant à être utilisé chez l\'homme à des fins médicales'
+      id: 'def_1',
+      text: 'Instrument, appareil, équipement, logiciel, implant, réactif, matière ou autre article destiné par le fabricant à être utilisé chez l\'homme à des fins médicales',
+      correctTermId: 'term_1'
     },
     {
-      id: '2',
-      term: 'SMQ',
-      definition: 'Système de Management de la Qualité - ensemble d\'éléments corrélés ou en interaction d\'un organisme, utilisés pour établir des politiques, des objectifs et des processus'
+      id: 'def_2',
+      text: 'Système de Management de la Qualité - ensemble d\'éléments corrélés ou en interaction d\'un organisme, utilisés pour établir des politiques, des objectifs et des processus',
+      correctTermId: 'term_2'
     },
     {
-      id: '3',
-      term: 'Gestion des risques',
-      definition: 'Application systématique de politiques, procédures et pratiques de management aux tâches d\'analyse, d\'évaluation, de maîtrise et de surveillance du risque'
+      id: 'def_3',
+      text: 'Application systématique de politiques, procédures et pratiques de management aux tâches d\'analyse, d\'évaluation, de maîtrise et de surveillance du risque',
+      correctTermId: 'term_3'
     },
     {
-      id: '4',
-      term: 'Surveillance post-commercialisation',
-      definition: 'Toutes les activités entreprises par les fabricants conjointement avec les distributeurs pour instituer et tenir à jour une procédure systématique'
+      id: 'def_4',
+      text: 'Toutes les activités entreprises par les fabricants conjointement avec les distributeurs pour instituer et tenir à jour une procédure systématique',
+      correctTermId: 'term_4'
     },
     {
-      id: '5',
-      term: 'Validation',
-      definition: 'Confirmation par des preuves tangibles que les exigences pour une application ou un usage spécifique prévu ont été satisfaites'
+      id: 'def_5',
+      text: 'Confirmation par des preuves tangibles que les exigences pour une application ou un usage spécifique prévu ont été satisfaites',
+      correctTermId: 'term_5'
     },
     {
-      id: '6',
-      term: 'Dossier technique',
-      definition: 'Compilation de documents qui démontre la conformité du dispositif médical aux exigences du présent document'
+      id: 'def_6',
+      text: 'Compilation de documents qui démontre la conformité du dispositif médical aux exigences du présent document',
+      correctTermId: 'term_6'
     }
   ];
 
+  const [terms, setTerms] = useState<Term[]>([]);
+  const [definitions, setDefinitions] = useState<Definition[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [draggedTerm, setDraggedTerm] = useState<string | null>(null);
   const [attempts, setAttempts] = useState<number>(0);
@@ -59,12 +76,22 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
   const [showSuccess, setShowSuccess] = useState<boolean>(false);
   const [selectedTerm, setSelectedTerm] = useState<string | null>(null);
 
-  // Mélanger les définitions pour éviter l'ordre logique
-  const [shuffledDefinitions, setShuffledDefinitions] = useState<Term[]>([]);
+  // Fonction pour mélanger un tableau
+  const shuffleArray = <T,>(array: T[]): T[] => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  };
 
+  // Initialiser et mélanger les termes et définitions
   useEffect(() => {
-    const shuffled = [...termsData].sort(() => Math.random() - 0.5);
-    setShuffledDefinitions(shuffled);
+    const shuffledTerms = shuffleArray(originalTerms);
+    const shuffledDefinitions = shuffleArray(originalDefinitions);
+    setTerms(shuffledTerms);
+    setDefinitions(shuffledDefinitions);
   }, []);
 
   const handleDragStart = (termId: string) => {
@@ -116,7 +143,7 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
   };
 
   const checkAnswers = () => {
-    if (matches.length !== termsData.length) {
+    if (matches.length !== originalTerms.length) {
       alert('Veuillez associer tous les termes avant de vérifier !');
       return;
     }
@@ -125,7 +152,8 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
     let incorrect = 0;
 
     matches.forEach(match => {
-      if (match.termId === match.definitionId) {
+      const definition = definitions.find(def => def.id === match.definitionId);
+      if (definition && definition.correctTermId === match.termId) {
         correct++;
       } else {
         incorrect++;
@@ -135,7 +163,7 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
     setAttempts(prev => prev + 1);
     setLastResult({ correct, incorrect });
 
-    if (correct === termsData.length) {
+    if (correct === originalTerms.length) {
       setIsComplete(true);
       setShowSuccess(true);
       
@@ -145,7 +173,7 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
         blockId: 'iso-13485-matching-game', 
         completed: true,
         score: correct,
-        maxScore: termsData.length,
+        maxScore: originalTerms.length,
         attempts: attempts + 1
       }, '*');
       window.parent.postMessage({ 
@@ -153,7 +181,7 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
         blockId: 'iso-13485-matching-game', 
         completed: true,
         score: correct,
-        maxScore: termsData.length,
+        maxScore: originalTerms.length,
         attempts: attempts + 1
       }, '*');
 
@@ -165,8 +193,9 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
     setMatches([]);
     setLastResult(null);
     setSelectedTerm(null);
-    const shuffled = [...termsData].sort(() => Math.random() - 0.5);
-    setShuffledDefinitions(shuffled);
+    // Remélanger seulement les définitions pour une nouvelle disposition
+    const shuffledDefinitions = shuffleArray(originalDefinitions);
+    setDefinitions(shuffledDefinitions);
   };
 
   const startNewGame = () => {
@@ -175,8 +204,11 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
     setLastResult(null);
     setIsComplete(false);
     setSelectedTerm(null);
-    const shuffled = [...termsData].sort(() => Math.random() - 0.5);
-    setShuffledDefinitions(shuffled);
+    // Remélanger à la fois les termes et les définitions
+    const shuffledTerms = shuffleArray(originalTerms);
+    const shuffledDefinitions = shuffleArray(originalDefinitions);
+    setTerms(shuffledTerms);
+    setDefinitions(shuffledDefinitions);
   };
 
   const getMatchedDefinitionId = (termId: string) => {
@@ -187,6 +219,11 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
   const getMatchedTermId = (definitionId: string) => {
     const match = matches.find(m => m.definitionId === definitionId);
     return match?.termId;
+  };
+
+  const getTermText = (termId: string) => {
+    const term = terms.find(t => t.id === termId);
+    return term?.text || '';
   };
 
   return (
@@ -294,7 +331,7 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
             Termes
           </h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            {termsData.map(term => {
+            {terms.map(term => {
               const matchedDefId = getMatchedDefinitionId(term.id);
               const isSelected = selectedTerm === term.id;
               
@@ -332,7 +369,7 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
                     }
                   }}
                 >
-                  {term.term}
+                  {term.text}
                   {matchedDefId && (
                     <button
                       onClick={(e) => {
@@ -371,7 +408,7 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
             Définitions
           </h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            {shuffledDefinitions.map(def => {
+            {definitions.map(def => {
               const matchedTermId = getMatchedTermId(def.id);
               
               return (
@@ -410,7 +447,7 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
                   }}
                 >
                   <div style={{ flex: 1 }}>
-                    {def.definition}
+                    {def.text}
                     {matchedTermId && (
                       <div style={{
                         marginTop: '10px',
@@ -418,7 +455,7 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
                         fontWeight: 'bold',
                         color: '#4CAF50'
                       }}>
-                        ✓ Associé à: {termsData.find(t => t.id === matchedTermId)?.term}
+                        ✓ Associé à: {getTermText(matchedTermId)}
                       </div>
                     )}
                   </div>
@@ -454,21 +491,21 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
       }}>
         <button
           onClick={checkAnswers}
-          disabled={matches.length !== termsData.length}
+          disabled={matches.length !== originalTerms.length}
           style={{
-            background: matches.length === termsData.length ? '#4CAF50' : '#666',
+            background: matches.length === originalTerms.length ? '#4CAF50' : '#666',
             color: 'white',
             border: 'none',
             padding: '15px 30px',
             borderRadius: '10px',
             fontSize: '18px',
             fontWeight: 'bold',
-            cursor: matches.length === termsData.length ? 'pointer' : 'not-allowed',
+            cursor: matches.length === originalTerms.length ? 'pointer' : 'not-allowed',
             transition: 'all 0.3s ease',
             boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
           }}
         >
-          Vérifier les réponses ({matches.length}/{termsData.length})
+          Vérifier les réponses ({matches.length}/{originalTerms.length})
         </button>
         
         <button
