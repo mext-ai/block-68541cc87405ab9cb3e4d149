@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface Term {
   id: string;
@@ -66,6 +66,18 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
     }
   ];
 
+  // Couleurs pour les connexions
+  const connectionColors = [
+    '#FF6B6B', // Rouge corail
+    '#4ECDC4', // Turquoise
+    '#45B7D1', // Bleu
+    '#96CEB4', // Vert menthe
+    '#FECA57', // Jaune doré
+    '#FF9FF3', // Rose
+    '#54A0FF', // Bleu clair
+    '#5F27CD'  // Violet
+  ];
+
   const [terms, setTerms] = useState<Term[]>([]);
   const [definitions, setDefinitions] = useState<Definition[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -75,6 +87,7 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
   const [isComplete, setIsComplete] = useState<boolean>(false);
   const [showSuccess, setShowSuccess] = useState<boolean>(false);
   const [selectedTerm, setSelectedTerm] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Fonction pour mélanger un tableau
   const shuffleArray = <T,>(array: T[]): T[] => {
@@ -93,6 +106,99 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
     setTerms(shuffledTerms);
     setDefinitions(shuffledDefinitions);
   }, []);
+
+  // Fonction pour obtenir la couleur d'une connexion
+  const getConnectionColor = (termId: string, definitionId: string): string => {
+    const matchIndex = matches.findIndex(match => 
+      match.termId === termId && match.definitionId === definitionId
+    );
+    return connectionColors[matchIndex % connectionColors.length];
+  };
+
+  // Fonction pour dessiner les lignes de connexion
+  const renderConnections = () => {
+    if (!containerRef.current || matches.length === 0) return null;
+
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const connections = [];
+
+    matches.forEach((match, index) => {
+      const termElement = document.querySelector(`[data-term-id="${match.termId}"]`) as HTMLElement;
+      const defElement = document.querySelector(`[data-def-id="${match.definitionId}"]`) as HTMLElement;
+
+      if (termElement && defElement) {
+        const termRect = termElement.getBoundingClientRect();
+        const defRect = defElement.getBoundingClientRect();
+
+        const x1 = termRect.right - containerRect.left;
+        const y1 = termRect.top + termRect.height / 2 - containerRect.top;
+        const x2 = defRect.left - containerRect.left;
+        const y2 = defRect.top + defRect.height / 2 - containerRect.top;
+
+        const color = connectionColors[index % connectionColors.length];
+
+        connections.push(
+          <line
+            key={`${match.termId}-${match.definitionId}`}
+            x1={x1}
+            y1={y1}
+            x2={x2}
+            y2={y2}
+            stroke={color}
+            strokeWidth="4"
+            strokeDasharray="0"
+            style={{
+              filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.3))',
+              animation: 'drawLine 0.5s ease-out'
+            }}
+          />
+        );
+
+        // Ajouter des points aux extrémités
+        connections.push(
+          <circle
+            key={`start-${match.termId}-${match.definitionId}`}
+            cx={x1}
+            cy={y1}
+            r="6"
+            fill={color}
+            style={{
+              filter: 'drop-shadow(1px 1px 2px rgba(0,0,0,0.3))'
+            }}
+          />
+        );
+
+        connections.push(
+          <circle
+            key={`end-${match.termId}-${match.definitionId}`}
+            cx={x2}
+            cy={y2}
+            r="6"
+            fill={color}
+            style={{
+              filter: 'drop-shadow(1px 1px 2px rgba(0,0,0,0.3))'
+            }}
+          />
+        );
+      }
+    });
+
+    return (
+      <svg
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          pointerEvents: 'none',
+          zIndex: 1
+        }}
+      >
+        {connections}
+      </svg>
+    );
+  };
 
   const handleDragStart = (termId: string) => {
     setDraggedTerm(termId);
@@ -134,6 +240,11 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
     // Ajouter la nouvelle correspondance
     newMatches.push({ termId, definitionId });
     setMatches(newMatches);
+
+    // Redessiner les connexions après un court délai
+    setTimeout(() => {
+      // Force re-render for connections
+    }, 100);
   };
 
   const removeMatch = (matchToRemove: Match) => {
@@ -226,6 +337,21 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
     return term?.text || '';
   };
 
+  const getMatchColor = (termId: string, definitionId: string) => {
+    const matchIndex = matches.findIndex(match => 
+      match.termId === termId && match.definitionId === definitionId
+    );
+    return matchIndex >= 0 ? connectionColors[matchIndex % connectionColors.length] : '#4CAF50';
+  };
+
+  // Force re-render of connections when matches change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      // This will trigger a re-render
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [matches]);
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -312,16 +438,23 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
       </div>
 
       {/* Game Area */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: '40px',
-        maxWidth: '1200px',
-        margin: '0 auto',
-        minHeight: '500px'
-      }}>
+      <div 
+        ref={containerRef}
+        style={{
+          position: 'relative',
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '40px',
+          maxWidth: '1200px',
+          margin: '0 auto',
+          minHeight: '500px'
+        }}
+      >
+        {/* Render connections */}
+        {renderConnections()}
+
         {/* Terms Column */}
-        <div>
+        <div style={{ position: 'relative', zIndex: 2 }}>
           <h2 style={{ 
             textAlign: 'center', 
             marginBottom: '20px',
@@ -334,10 +467,12 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
             {terms.map(term => {
               const matchedDefId = getMatchedDefinitionId(term.id);
               const isSelected = selectedTerm === term.id;
+              const matchColor = matchedDefId ? getMatchColor(term.id, matchedDefId) : '#4CAF50';
               
               return (
                 <div
                   key={term.id}
+                  data-term-id={term.id}
                   draggable
                   onDragStart={() => handleDragStart(term.id)}
                   onClick={() => handleTermClick(term.id)}
@@ -345,18 +480,18 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
                     background: isSelected 
                       ? 'rgba(255, 255, 0, 0.3)' 
                       : matchedDefId 
-                        ? 'rgba(0, 255, 0, 0.3)' 
+                        ? `rgba(${parseInt(matchColor.slice(1,3), 16)}, ${parseInt(matchColor.slice(3,5), 16)}, ${parseInt(matchColor.slice(5,7), 16)}, 0.3)` 
                         : 'rgba(255, 255, 255, 0.2)',
                     padding: '20px',
                     borderRadius: '10px',
                     cursor: 'pointer',
-                    border: isSelected ? '3px solid yellow' : matchedDefId ? '2px solid #4CAF50' : '2px solid transparent',
+                    border: isSelected ? '3px solid yellow' : matchedDefId ? `3px solid ${matchColor}` : '2px solid transparent',
                     transition: 'all 0.3s ease',
                     fontSize: '16px',
                     fontWeight: 'bold',
                     textAlign: 'center',
                     userSelect: 'none',
-                    boxShadow: isSelected ? '0 0 15px rgba(255, 255, 0, 0.5)' : '0 2px 10px rgba(0,0,0,0.1)'
+                    boxShadow: isSelected ? '0 0 15px rgba(255, 255, 0, 0.5)' : matchedDefId ? `0 0 15px ${matchColor}40` : '0 2px 10px rgba(0,0,0,0.1)'
                   }}
                   onMouseEnter={(e) => {
                     if (!matchedDefId) {
@@ -398,7 +533,7 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
         </div>
 
         {/* Definitions Column */}
-        <div>
+        <div style={{ position: 'relative', zIndex: 2 }}>
           <h2 style={{ 
             textAlign: 'center', 
             marginBottom: '20px',
@@ -410,30 +545,32 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             {definitions.map(def => {
               const matchedTermId = getMatchedTermId(def.id);
+              const matchColor = matchedTermId ? getMatchColor(matchedTermId, def.id) : '#4CAF50';
               
               return (
                 <div
                   key={def.id}
+                  data-def-id={def.id}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, def.id)}
                   onClick={() => handleDefinitionClick(def.id)}
                   style={{
                     background: matchedTermId 
-                      ? 'rgba(0, 255, 0, 0.3)' 
+                      ? `rgba(${parseInt(matchColor.slice(1,3), 16)}, ${parseInt(matchColor.slice(3,5), 16)}, ${parseInt(matchColor.slice(5,7), 16)}, 0.3)`
                       : selectedTerm 
                         ? 'rgba(255, 255, 0, 0.1)' 
                         : 'rgba(255, 255, 255, 0.2)',
                     padding: '20px',
                     borderRadius: '10px',
                     cursor: selectedTerm ? 'pointer' : 'default',
-                    border: matchedTermId ? '2px solid #4CAF50' : selectedTerm ? '2px dashed yellow' : '2px solid transparent',
+                    border: matchedTermId ? `3px solid ${matchColor}` : selectedTerm ? '2px dashed yellow' : '2px solid transparent',
                     transition: 'all 0.3s ease',
                     fontSize: '14px',
                     lineHeight: '1.4',
                     minHeight: '80px',
                     display: 'flex',
                     alignItems: 'center',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                    boxShadow: matchedTermId ? `0 0 15px ${matchColor}40` : '0 2px 10px rgba(0,0,0,0.1)'
                   }}
                   onMouseEnter={(e) => {
                     if (!matchedTermId && selectedTerm) {
@@ -453,7 +590,7 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
                         marginTop: '10px',
                         fontSize: '12px',
                         fontWeight: 'bold',
-                        color: '#4CAF50'
+                        color: matchColor
                       }}>
                         ✓ Associé à: {getTermText(matchedTermId)}
                       </div>
@@ -550,6 +687,11 @@ const Block: React.FC<BlockProps> = ({ title = "Quiz ISO 13485", description }) 
           @keyframes pulse {
             from { opacity: 0.8; }
             to { opacity: 1; }
+          }
+          
+          @keyframes drawLine {
+            from { stroke-dasharray: 1000; stroke-dashoffset: 1000; }
+            to { stroke-dasharray: 1000; stroke-dashoffset: 0; }
           }
         `}
       </style>
